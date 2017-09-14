@@ -13,6 +13,8 @@
 readonly ME="z-bump"
 readonly VERSION=""
 
+readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
+
 # Usage helper
 
 _usage()
@@ -90,24 +92,63 @@ done
 current_branch="`git symbolic-ref --short -q HEAD`"
 current_commit="`git rev-parse HEAD`"
 
-initial_commit_ts="`git log --pretty=format:'%at' --reverse | head -n 1`"
+latest_default_commit="`git rev-parse ${DEFAULT_BRANCH}`"
 
+default_history_ts=("${(f)$(git log --pretty=format:'%at' ${latest_default_commit})}")
+initial_default_commit_ts="${default_history_ts[-1]}"
+latest_default_commit_ts="${default_history_ts[1]}"
 
-diff_to_default=("${(@f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
-long_commit_history=("${(@f)$(git rev-list ${current_commit})}")
+default_commits_count="`git rev-list ${latest_default_commit} --count`"
 
-current_branch_commits_count=`echo ${#diff_to_default[@]}`
+current_to_default=("${(f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
+current_commits_count=`echo ${#current_to_default[@]}`
 
-# (long_commit_history - diff_to_default).first is the latest commit from default branch
+default_age=$(( (latest_default_commit_ts - initial_default_commit_ts) * 1000 / SECS_PER_YEAR ))
+
+initial_current_commit=""
+initial_current_commit_short="dev"
+
+[[ ! ${current_branch} =~ "dev" || -n ${DEBUG} ]] && {
+    initial_current_commit="`diff -u    <(git rev-list --first-parent ${current_branch}) \
+                                        <(git rev-list --first-parent ${DEFAULT_BRANCH}) \
+                                        | sed -ne 's/^-//p' \
+                                        | tail -n 1`"
+
+    [[ -z ${DEBUG} ]] && \
+        initial_current_commit_short="` echo ${initial_current_commit} \
+                                        | sed 's/[^a-zA-Z]//g' \
+                                        | sed -E 's/(.{3}).*$/\1/'`"
+}
+
+# Calculating the build number
+build_number=$(( default_commits_count + default_age ))
+[[ ${current_branch} =~ "dev" || -n ${initial_current_commit} ]] \
+    && build_number+="-${initial_current_commit_short}${current_commits_count}"
 
 # Set OUTPUT here if debug is enabled to always override -o option
 [[ -n ${DEBUG} ]] && {
+    default_history=("${(f)$(git log --pretty=format:'%H' ${latest_default_commit})}")
+    initial_default_commit="${default_history[-1]}"
+    latest_default_commit="${default_history[1]}"
+
     echo "Current release number (read from ${OUTPUT}): `cat ${OUTPUT}`"
 
     OUTPUT="/dev/stdout"
 
-    echo "Default branch: ${DEFAULT_BRANCH}\nCurrent branch: ${current_branch}"
-    echo "Initial commit timestamp: ${initial_commit_ts}"
-    echo "Current branch commits: ${current_branch_commits_count}"
+    cat <<-EODEBUG
+Default branch: ${DEFAULT_BRANCH}
+Current branch: ${current_branch}
+
+On ${DEFAULT_BRANCH} ...
+Initial commit timestamp: ${initial_default_commit_ts} (${initial_default_commit})
+Latest commit timestamp: ${latest_default_commit_ts} (${latest_default_commit})
+
+On ${current_branch} ...
+Initial commit: ${initial_current_commit_short} (${initial_current_commit})
+Latest commit: ${current_commit}
+Commits deviation from ${DEFAULT_BRANCH}: ${current_commits_count}
+
+Build number: ${build_number}
+EODEBUG
 }
 
