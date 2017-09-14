@@ -87,5 +87,27 @@ done
 #  GO
 # ----
 
+current_branch="`git symbolic-ref --short -q HEAD`"
+current_commit="`git rev-parse HEAD`"
 
+initial_commit_ts="`git log --pretty=format:'%at' --reverse | head -n 1`"
+
+
+diff_to_default=("${(@f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
+long_commit_history=("${(@f)$(git rev-list ${current_commit})}")
+
+current_branch_commits_count=`echo ${#diff_to_default[@]}`
+
+# (long_commit_history - diff_to_default).first is the latest commit from default branch
+
+# Set OUTPUT here if debug is enabled to always override -o option
+[[ -n ${DEBUG} ]] && {
+    echo "Current release number (read from ${OUTPUT}): `cat ${OUTPUT}`"
+
+    OUTPUT="/dev/stdout"
+
+    echo "Default branch: ${DEFAULT_BRANCH}\nCurrent branch: ${current_branch}"
+    echo "Initial commit timestamp: ${initial_commit_ts}"
+    echo "Current branch commits: ${current_branch_commits_count}"
+}
 
