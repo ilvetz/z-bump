@@ -1,0 +1,91 @@
+#!/bin/zsh
+
+# z-bump
+# ------
+# A VERSION bumper that automate build-number generation when using Git.
+#
+# Version:
+# Last update:
+#
+
+# Constants
+
+readonly ME="z-bump"
+readonly VERSION=""
+
+# Usage helper
+
+_usage()
+{
+    cat <<-EOUSAGE
+usage: ${ME} [<options>[=<value>]] [<command>]
+
+Special options:
+
+  -h|--help               show this message, then exit
+  -V|--version            show z-bump version, then exit
+  -d|--debug              simulate bumping and enable debugging
+
+Normal options:
+  -b|--branch=<branch>    override default stable branch
+  -o|--output=<path>      override default VERSION file
+  -c|--clog=<path>        override default CHANGELOG file
+
+Commands:
+  major                   bump major version and reset other
+                          counters (except for the build number)
+  minor                   bump minor and reset patch counters
+  patch                   bump patch version
+EOUSAGE
+}
+
+# Set defaults
+
+DEBUG=""
+
+DEFAULT_BRANCH="master"
+CLOG="CHANGELOG"
+OUTPUT="VERSION"
+
+# Parse options from command line
+
+while [ "${1}" != "" ]; do
+    local param=`echo ${1} | awk -F= '{print $1}'`
+    local value=`echo ${1} | awk -F= '{print $2}'`
+
+    case ${param} in
+        -h | --help)
+            _usage
+            exit 0
+            ;;
+        -d | --debug)
+            DEBUG="yes"
+            ;;
+        -V | --version)
+            echo "${ME} version ${VERSION}"
+            exit 0
+            ;;
+        -b | --branch)
+            DEFAULT_BRANCH=${value}
+            ;;
+        -c | --clog)
+            CLOG=${value}
+            ;;
+        -o | --output)
+            OUTPUT=${value}
+            ;;
+        *)
+            echo "Unknown option: ${param}"
+            _usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# ----
+#  GO
+# ----
+
+
+
