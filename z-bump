@@ -1,17 +1,31 @@
 #!/bin/zsh
 
+# Copyright 2017 Michele Vetturi
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 # z-bump
 # ------
-# A VERSION bumper that automate build-number generation when using Git.
+# A bumper that automate versioning projects on Git repositories.
 #
-# Version:
-# Last update:
+# Version: 0.1.0.1-rc5
+# Last update: 2017-09-15
 #
 
 # Constants
 
 readonly ZBUMP="z-bump"
-readonly ZBUMP_VERSION="0.1.0"
+readonly ZBUMP_VERSION="0.1.0.1-rc5"
 
 readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
 
