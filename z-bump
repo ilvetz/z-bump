@@ -10,28 +10,41 @@
 
 # Constants
 
-readonly ME="z-bump"
-readonly VERSION=""
+readonly ZBUMP="z-bump"
+readonly ZBUMP_VERSION="0.1.0"
 
 readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
+
+# Set defaults
+
+DEBUG=""
+VERSION=""
+COMMAND="build"
+
+DEFAULT_BRANCH="master"
+DEVELOP_BRANCH="dev"
+RELEASE_BRANCH_PREFIX="release"
+
+OUTPUT="VERSION"
 
 # Usage helper
 
 _usage()
 {
     cat <<-EOUSAGE
-usage: ${ME} [<options>[=<value>]] [<command>]
+usage: ${ZBUMP} [<options>[=<value>]] [<command>]
 
 Special options:
 
   -h|--help               show this message, then exit
   -V|--version            show z-bump version, then exit
-  -d|--debug              simulate bumping and enable debugging
+  -x|--debug              enable debugging (simulates bump)
 
 Normal options:
-  -b|--branch=<branch>    override default stable branch
-  -o|--output=<path>      override default VERSION file
-  -c|--clog=<path>        override default CHANGELOG file
+  -m|--master=<branch>    override default stable branch (${DEFAULT_BRANCH})
+  -d|--develop=<branch>   override default development branch (${DEVELOP_BRANCH})
+  -r|--release=<prefix>   override prefix for release branches (${RELEASE_BRANCH_PREFIX})
+  -o|--output=<path>      override default output for the file ${OUTPUT}
 
 Commands:
   major                   bump major version and reset other
@@ -40,14 +53,6 @@ Commands:
   patch                   bump patch version
 EOUSAGE
 }
-
-# Set defaults
-
-DEBUG=""
-
-DEFAULT_BRANCH="master"
-CLOG="CHANGELOG"
-OUTPUT="VERSION"
 
 # Parse options from command line
 
@@ -60,23 +65,28 @@ while [ "${1}" != "" ]; do
             _usage
             exit 0
             ;;
-        -d | --debug)
+        -x | --debug)
             DEBUG="yes"
             ;;
         -V | --version)
-            echo "${ME} version ${VERSION}"
+            echo "${ZBUMP} version ${ZBUMP_VERSION}"
             exit 0
             ;;
-        -b | --branch)
+        -m | --master)
             DEFAULT_BRANCH=${value}
             ;;
-        -c | --clog)
-            CLOG=${value}
+        -d | --develop)
+            DEVELOP_BRANCH=${value}
+            ;;
+        -r | --release)
+            RELEASE_BRANCH_PREFIX=${value}
             ;;
         -o | --output)
             OUTPUT=${value}
             ;;
         *)
+            [[ ${param} = ("major"|"minor"|"patch") ]] && COMMAND=${param}; break
+
             echo "Unknown option: ${param}"
             _usage
             exit 1
@@ -89,41 +99,59 @@ done
 #  GO
 # ----
 
+# Load current version
+VERSION="`cat ${OUTPUT}`"
+
+# Get current branch and latest commit hash
 current_branch="`git symbolic-ref --short -q HEAD`"
 current_commit="`git rev-parse HEAD`"
 
+# Get latest commit hash for default branch
 latest_default_commit="`git rev-parse ${DEFAULT_BRANCH}`"
 
+# Build commit history for default branch and count commits
 default_history_ts=("${(f)$(git log --pretty=format:'%at' ${latest_default_commit})}")
-initial_default_commit_ts="${default_history_ts[-1]}"
-latest_default_commit_ts="${default_history_ts[1]}"
-
 default_commits_count="`git rev-list ${latest_default_commit} --count`"
 
-current_to_default=("${(f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
-current_commits_count=`echo ${#current_to_default[@]}`
-
+# Get first and last timestamp for default branch and calculate its age
+initial_default_commit_ts="${default_history_ts[-1]}"
+latest_default_commit_ts="${default_history_ts[1]}"
 default_age=$(( (latest_default_commit_ts - initial_default_commit_ts) * 1000 / SECS_PER_YEAR ))
 
-initial_current_commit=""
-initial_current_commit_short="dev"
+# Calculating the basic build number
+build_number=$(( default_commits_count + default_age ))
 
-[[ ! ${current_branch} =~ "dev" || -n ${DEBUG} ]] && {
+branch_short_name=""
+current_to_default=""
+current_commits_count=""
+
+# If on develop branch ...
+[[ ${current_branch} = "${DEVELOP_BRANCH}" ]] && branch_short_name="dev"
+
+# If on a release branch ...
+[[ ${current_branch} =~ "${RELEASE_BRANCH_PREFIX}" ]] && branch_short_name="rc"
+
+# If on a derived branch (not master|develop|release) ...
+if [[ -z ${branch_short_name} ]]; then
     initial_current_commit="`diff -u    <(git rev-list --first-parent ${current_branch}) \
                                         <(git rev-list --first-parent ${DEFAULT_BRANCH}) \
                                         | sed -ne 's/^-//p' \
                                         | tail -n 1`"
 
-    [[ -z ${DEBUG} ]] && \
-        initial_current_commit_short="` echo ${initial_current_commit} \
-                                        | sed 's/[^a-zA-Z]//g' \
-                                        | sed -E 's/(.{3}).*$/\1/'`"
-}
+    branch_short_name="`echo ${initial_current_commit} \
+                        | sed 's/[^a-zA-Z]//g' \
+                        | sed -E 's/(.{3}).*$/\1/'`"
+fi
 
-# Calculating the build number
-build_number=$(( default_commits_count + default_age ))
-[[ ${current_branch} =~ "dev" || -n ${initial_current_commit} ]] \
-    && build_number+="-${initial_current_commit_short}${current_commits_count}"
+# If not on master branch ...
+if [[ -n ${branch_short_name} ]]; then
+    # Build commit history for current branch (deriving from default) and count commits
+    current_to_default=("${(f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
+    current_commits_count="`echo ${#current_to_default[@]}`"
+
+    # Composing the build string
+    build_number+="-${branch_short_name}${current_commits_count}"
+fi
 
 # Set OUTPUT here if debug is enabled to always override -o option
 [[ -n ${DEBUG} ]] && {
@@ -131,13 +159,14 @@ build_number=$(( default_commits_count + default_age ))
     initial_default_commit="${default_history[-1]}"
     latest_default_commit="${default_history[1]}"
 
-    echo "Current release number (read from ${OUTPUT}): `cat ${OUTPUT}`"
+    echo "Current release (read from ${OUTPUT}): ${VERSION}\n"
 
     OUTPUT="/dev/stdout"
 
     cat <<-EODEBUG
 Default branch: ${DEFAULT_BRANCH}
 Current branch: ${current_branch}
+Bump command: ${COMMAND}
 
 On ${DEFAULT_BRANCH} ...
 Initial commit timestamp: ${initial_default_commit_ts} (${initial_default_commit})
@@ -150,5 +179,23 @@ Commits deviation from ${DEFAULT_BRANCH}: ${current_commits_count}
 
 Build number: ${build_number}
 EODEBUG
+
+    echo -n "New release: "
 }
 
+case ${COMMAND} in
+    major)
+        # nice snippet but does not append build number nor handle reset of counters
+        #awk -F. '/[0-9]+\./{$1++;print}' OFS=. <<< ${vers} > ${output}
+        echo "`awk -F. '/[0-9]+\./{$1++; print $1\".0.0\"}' OFS=. <<< ${VERSION}`.${build_number}" > ${OUTPUT}
+        ;;
+    minor)
+        echo "`awk -F. '/[0-9]+\./{$2++; print $1\".\"$2\".0\"}' OFS=. <<< ${VERSION}`.${build_number}" > ${OUTPUT}
+        ;;
+    patch)
+        echo "`awk -F. '/[0-9]+\./{$3++; print $1\".\"$2\".\"$3}' OFS=. <<< ${VERSION}`.${build_number}" > ${OUTPUT}
+        ;;
+    build)
+        echo "`awk -F. '/[0-9]+\./{print $1\".\"$2\".\"$3}' OFS=. <<< ${VERSION}`.${build_number}" > ${OUTPUT}
+        ;;
+esac
