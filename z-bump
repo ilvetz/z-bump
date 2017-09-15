@@ -18,14 +18,14 @@
 # ------
 # A bumper that automate versioning projects on Git repositories.
 #
-# Version: 0.1.0.1-rc5
+# Version: 0.1.1.11
 # Last update: 2017-09-15
 #
 
 # Constants
 
 readonly ZBUMP="z-bump"
-readonly ZBUMP_VERSION="0.1.0.1-rc5"
+readonly ZBUMP_VERSION="0.1.1.11"
 
 readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
 
@@ -98,9 +98,10 @@ while [ "${1}" != "" ]; do
         -o | --output)
             OUTPUT=${value}
             ;;
+        major | minor | patch)
+            COMMAND=${param}
+            ;;
         *)
-            [[ ${param} = ("major"|"minor"|"patch") ]] && COMMAND=${param}; break
-
             echo "Unknown option: ${param}"
             _usage
             exit 1
