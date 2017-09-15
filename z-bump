@@ -2,16 +2,16 @@
 
 # z-bump
 # ------
-# A VERSION bumper that automate build-number generation when using Git.
+# A bumper that automate versioning projects on Git repositories.
 #
-# Version:
-# Last update:
+# Version: 0.1.0
+# Last update: 2017-09-15
 #
 
 # Constants
 
 readonly ZBUMP="z-bump"
-readonly ZBUMP_VERSION="0.1.0"
+readonly ZBUMP_VERSION="0.1.0.1-rc5"
 
 readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
 
