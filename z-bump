@@ -18,14 +18,14 @@
 # ------
 # A bumper that automate versioning projects on Git repositories.
 #
-# Version: 0.1.1.11
+# Version: 0.1.2.13
 # Last update: 2017-09-15
 #
 
 # Constants
 
 readonly ZBUMP="z-bump"
-readonly ZBUMP_VERSION="0.1.1.11"
+readonly ZBUMP_VERSION="0.1.2.13"
 
 readonly SECS_PER_YEAR=$((60 * 60 * 24 * 365))
 
@@ -160,9 +160,15 @@ fi
 
 # If not on master branch ...
 if [[ -n ${branch_short_name} ]]; then
-    # Build commit history for current branch (deriving from default) and count commits
-    current_to_default=("${(f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
-    current_commits_count="`echo ${#current_to_default[@]}`"
+    # Build commit history for current branch and count commits
+    # (deriving from default, or develop if it's a release candidate)
+    if [ ${branch_short_name} = "rc" ]; then
+        current_to_develop=("${(f)$(git rev-list ${DEVELOP_BRANCH}.. || git rev-list origin/${DEVELOP_BRANCH}..)}")
+        current_commits_count="`echo ${#current_to_develop[@]}`"
+    else
+        current_to_default=("${(f)$(git rev-list ${DEFAULT_BRANCH}.. || git rev-list origin/${DEFAULT_BRANCH}..)}")
+        current_commits_count="`echo ${#current_to_default[@]}`"
+    fi
 
     # Composing the build string
     build_number+="-${branch_short_name}${current_commits_count}"
